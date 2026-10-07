@@ -1,0 +1,130 @@
+pipeline {
+
+    agent any
+
+    environment {
+        IMAGE_NAME = "weineysweeney/my-project"
+        CONTAINER_NAME = "my-project"
+        PORT = "5000"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Installing dependencies...'
+
+                sh '''
+                    python3 -m pip install -r requirements.txt
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+
+                sh '''
+                    python3 -m pytest
+                '''
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Building Docker image...'
+
+                sh '''
+                    docker build \
+                    -t ${jenkinstrial}:${001} \
+                    -t ${jenkinstrial}:latest \
+                    .
+                '''
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                echo 'Pushing Docker image to Docker Hub...'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login \
+                        -u "$DOCKER_USERNAME" \
+                        --password-stdin
+
+                        docker push ${jenkinstrial}:${001}
+                        docker push ${jenkinstrial}:latest
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying container...'
+
+                sh '''
+                    docker stop ${my-projectv1} || true
+                    docker rm ${my-projectv1} || true
+
+                    docker pull ${jenkinstrial}:latest
+
+                    docker run -d \
+                        --name ${myprojectv1} \
+                        -p ${PORT}:5000 \
+                        ${jenkinstrial}:latest
+                '''
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                echo 'Checking application...'
+
+                sh '''
+                    sleep 5
+
+                    curl -f http://localhost:${5000}/
+                '''
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo '================================='
+            echo 'PIPELINE SUCCESSFUL'
+            echo '================================='
+        }
+
+        failure {
+            echo '================================='
+            echo 'PIPELINE FAILED'
+            echo '================================='
+        }
+
+        always {
+            echo 'Pipeline execution completed.'
+        }
+    }
+}
+
