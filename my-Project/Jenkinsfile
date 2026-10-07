@@ -126,7 +126,6 @@ post {
         echo 'Pipeline execution completed.'
     }
 }
-```
 
 }
       
