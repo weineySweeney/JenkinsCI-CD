@@ -1,138 +1,133 @@
 pipeline {
 
-    agent any
+```
+agent any
 
-    environment {
-        IMAGE_NAME = "weineysweeney/my-project"
-        CONTAINER_NAME = "my-project"
-        PORT = "5000"
-    }
+environment {
+    IMAGE_NAME = "weineysweeney/my-project"
+    CONTAINER_NAME = "my-project"
+    PORT = "5000"
+}
 
-    stages {
+stages {
 
-        stage('Checkout') {
-            steps {
-                echo 'Checking out source code...'
-
-                checkout scm
-            }
-        }
-
-        stage('Build') {
-            steps {
-                dir('my-Project') {
-                    echo 'Creating Python virtual environment and installing dependencies...'
-
-                    sh '''
-                        python3 -m venv venv
-                        ./venv/bin/pip install --upgrade pip
-                        ./venv/bin/pip install -r requirement.txt
-                    '''
-                }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                dir('my-Project') {
-                    echo 'Running tests...'
-
-                    sh '''
-                        ./venv/bin/pytest
-                    '''
-                }
-            }
-        }
-
-        stage('Docker Build') {
-            steps {
-                dir('my-Project') {
-                    echo 'Building Docker image...'
-
-                    sh '''
-                        docker build \
-                        -t ${IMAGE_NAME}:${BUILD_NUMBER} \
-                        -t ${IMAGE_NAME}:latest \
-                        .
-                    '''
-                }
-            }
-        }
-
-        stage('Docker Push') {
-            steps {
-                echo 'Pushing Docker image to Docker Hub...'
-
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
-
-                    sh '''
-                        echo "$DOCKER_PASSWORD" | docker login \
-                        -u "$DOCKER_USERNAME" \
-                        --password-stdin
-
-                        docker push ${IMAGE_NAME}:${BUILD_NUMBER}
-                        docker push ${IMAGE_NAME}:latest
-
-                        docker logout
-                    '''
-                }
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo 'Deploying container...'
+    stage('Build') {
+        steps {
+            dir('my-Project') {
+                echo 'Creating Python virtual environment and installing dependencies...'
 
                 sh '''
-                    docker stop ${CONTAINER_NAME} || true
-                    docker rm ${CONTAINER_NAME} || true
-
-                    docker pull ${IMAGE_NAME}:latest
-
-                    docker run -d \
-                        --name ${CONTAINER_NAME} \
-                        -p ${PORT}:5000 \
-                        ${IMAGE_NAME}:latest
-                '''
-            }
-        }
-
-        stage('Smoke Test') {
-            steps {
-                echo 'Checking application...'
-
-                sh '''
-                    sleep 5
-
-                    curl -f http://localhost:${PORT}/
+                    rm -rf venv
+                    python3 -m venv venv
+                    ./venv/bin/python -m pip install --upgrade pip
+                    ./venv/bin/python -m pip install -r requirement.txt
                 '''
             }
         }
     }
 
-    post {
+    stage('Test') {
+        steps {
+            dir('my-Project') {
+                echo 'Running tests...'
 
-        success {
-            echo '================================='
-            echo 'PIPELINE SUCCESSFUL'
-            echo '================================='
+                sh '''
+                    ./venv/bin/python -m pytest
+                '''
+            }
         }
+    }
 
-        failure {
-            echo '================================='
-            echo 'PIPELINE FAILED'
-            echo '================================='
+    stage('Docker Build') {
+        steps {
+            dir('my-Project') {
+                echo 'Building Docker image...'
+
+                sh '''
+                    docker build \
+                    -t ${IMAGE_NAME}:${BUILD_NUMBER} \
+                    -t ${IMAGE_NAME}:latest \
+                    .
+                '''
+            }
         }
+    }
 
-        always {
-            echo 'Pipeline execution completed.'
+    stage('Docker Push') {
+        steps {
+            echo 'Pushing Docker image to Docker Hub...'
+
+            withCredentials([
+                usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )
+            ]) {
+
+                sh '''
+                    echo "$DOCKER_PASSWORD" | docker login \
+                    -u "$DOCKER_USERNAME" \
+                    --password-stdin
+
+                    docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                    docker push ${IMAGE_NAME}:latest
+
+                    docker logout
+                '''
+            }
+        }
+    }
+
+    stage('Deploy') {
+        steps {
+            echo 'Deploying container...'
+
+            sh '''
+                docker stop ${CONTAINER_NAME} || true
+                docker rm ${CONTAINER_NAME} || true
+
+                docker pull ${IMAGE_NAME}:latest
+
+                docker run -d \
+                    --name ${CONTAINER_NAME} \
+                    -p ${PORT}:5000 \
+                    ${IMAGE_NAME}:latest
+            '''
+        }
+    }
+
+    stage('Smoke Test') {
+        steps {
+            echo 'Checking application...'
+
+            sh '''
+                sleep 5
+                curl -f http://localhost:${PORT}/
+            '''
         }
     }
 }
 
+post {
+
+    success {
+        echo '================================='
+        echo 'PIPELINE SUCCESSFUL'
+        echo '================================='
+    }
+
+    failure {
+        echo '================================='
+        echo 'PIPELINE FAILED'
+        echo '================================='
+    }
+
+    always {
+        echo 'Pipeline execution completed.'
+    }
+}
+```
+
+}
+      
