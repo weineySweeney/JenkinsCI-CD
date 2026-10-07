@@ -1,3 +1,4 @@
+```groovy
 pipeline {
 
     agent any
@@ -20,34 +21,42 @@ pipeline {
 
         stage('Build') {
             steps {
-                echo 'Installing dependencies...'
+                dir('my-Project') {
+                    echo 'Creating Python virtual environment and installing dependencies...'
 
-                sh '''
-                    python3 -m pip install -r requirements.txt
-                '''
+                    sh '''
+                        python3 -m venv venv
+                        ./venv/bin/pip install --upgrade pip
+                        ./venv/bin/pip install -r requirement.txt
+                    '''
+                }
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Running tests...'
+                dir('my-Project') {
+                    echo 'Running tests...'
 
-                sh '''
-                    python3 -m pytest
-                '''
+                    sh '''
+                        ./venv/bin/pytest
+                    '''
+                }
             }
         }
 
         stage('Docker Build') {
             steps {
-                echo 'Building Docker image...'
+                dir('my-Project') {
+                    echo 'Building Docker image...'
 
-                sh '''
-                    docker build \
-                    -t ${jenkinstrial}:${001} \
-                    -t ${jenkinstrial}:latest \
-                    .
-                '''
+                    sh '''
+                        docker build \
+                        -t ${IMAGE_NAME}:${BUILD_NUMBER} \
+                        -t ${IMAGE_NAME}:latest \
+                        .
+                    '''
+                }
             }
         }
 
@@ -68,8 +77,8 @@ pipeline {
                         -u "$DOCKER_USERNAME" \
                         --password-stdin
 
-                        docker push ${jenkinstrial}:${001}
-                        docker push ${jenkinstrial}:latest
+                        docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                        docker push ${IMAGE_NAME}:latest
 
                         docker logout
                     '''
@@ -82,15 +91,15 @@ pipeline {
                 echo 'Deploying container...'
 
                 sh '''
-                    docker stop ${my-projectv1} || true
-                    docker rm ${my-projectv1} || true
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
 
-                    docker pull ${jenkinstrial}:latest
+                    docker pull ${IMAGE_NAME}:latest
 
                     docker run -d \
-                        --name ${myprojectv1} \
+                        --name ${CONTAINER_NAME} \
                         -p ${PORT}:5000 \
-                        ${jenkinstrial}:latest
+                        ${IMAGE_NAME}:latest
                 '''
             }
         }
@@ -102,7 +111,7 @@ pipeline {
                 sh '''
                     sleep 5
 
-                    curl -f http://localhost:${5000}/
+                    curl -f http://localhost:${PORT}/
                 '''
             }
         }
@@ -127,4 +136,5 @@ pipeline {
         }
     }
 }
+```
 
